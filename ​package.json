@@ -1,0 +1,9 @@
+{
+  "name": "minecraft-human-bot",
+  "version": "1.0.0",
+  "description": "Smart human-like AFK bot for Minecraft",
+  "main": "bot.js",
+  "dependencies": {
+    "mineflayer": "^4.20.0"
+  }
+}
