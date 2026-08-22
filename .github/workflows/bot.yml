@@ -1,0 +1,24 @@
+name: Minecraft 24/7 Bot
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # প্রতি ৩০ মিনিট পর পর এটি অটোমেটিক রিস্টার্ট হয়ে রান করবে
+  workflow_dispatch:
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Bot
+        run: timeout 1740s node bot.js # ২৯ মিনিট একটানা চালিয়ে প্রসেস বন্ধ করবে, এরপর ক্রন জব আবার নতুন করে চালু করবে
