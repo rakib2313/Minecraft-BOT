@@ -2,7 +2,7 @@ name: Minecraft 24/7 Bot
 
 on:
   schedule:
-    - cron: '*/30 * * * *' # প্রতি ৩০ মিনিট পর পর এটি অটোমেটিক রিস্টার্ট হয়ে রান করবে
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -21,4 +21,13 @@ jobs:
         run: npm install
 
       - name: Run Bot
-        run: timeout 1740s node bot.js # ২৯ মিনিট একটানা চালিয়ে প্রসেস বন্ধ করবে, এরপর ক্রন জব আবার নতুন করে চালু করবে
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { execSync } = require('child_process');
+            try {
+              // বটটিকে ২৫ মিনিট একটানা চালিয়ে প্রসেস ক্লোজ করবে
+              execSync('node bot.js', { timeout: 1500000, stdio: 'inherit' });
+            } catch (e) {
+              console.log('Bot session ended or timeout reached, which is normal.');
+            }
