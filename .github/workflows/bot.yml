@@ -15,19 +15,10 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Install Dependencies
         run: npm install
 
-      - name: Run Bot
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { execSync } = require('child_process');
-            try {
-              // বটটিকে ২৫ মিনিট একটানা চালিয়ে প্রসেস ক্লোজ করবে
-              execSync('node bot.js', { timeout: 1500000, stdio: 'inherit' });
-            } catch (e) {
-              console.log('Bot session ended or timeout reached, which is normal.');
-            }
+      - name: Run Bot Script
+        run: node bot.js
