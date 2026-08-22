@@ -1,0 +1,24 @@
+name: Minecraft Bot 24-7
+
+on:
+  schedule:
+    - cron: '*/5 * * * *' # প্রতি ৫ মিনিট পর পর ট্রিগার হবে
+  workflow_dispatch:
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+  steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+
+    - name: Install Dependencies
+      run: npm install
+
+    - name: Run Bot Script
+      run: timeout 240s node bot.js # ৪ মিনিট একটানা চালিয়ে বন্ধ হবে, আবার ক্রনে চালু হবে
