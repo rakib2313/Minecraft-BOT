@@ -11,7 +11,7 @@ jobs:
   run-bot:
     runs-on: ubuntu-latest
     timeout-minutes: 360
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,11 +19,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '22'
 
       - name: Install dependencies
-        run: npm ci --prefer-offline --no-audit
+        run: npm install --no-audit --no-fund
 
       - name: Run AFK Bot
         env:
@@ -32,23 +31,22 @@ jobs:
           echo "Starting Minecraft AFK Bot..."
           node bot.js &
           BOT_PID=$!
-          
-          # Keep the workflow alive for 6 hours
+
           RUNTIME=21600
           ELAPSED=0
-          
+
           while [ $ELAPSED -lt $RUNTIME ]; do
             if ! kill -0 $BOT_PID 2>/dev/null; then
               echo "Bot process died, restarting..."
               node bot.js &
               BOT_PID=$!
             fi
-            
+
             sleep 60
             ELAPSED=$((ELAPSED + 60))
             echo "Runtime: $((ELAPSED / 60)) minutes / $((RUNTIME / 60)) minutes"
           done
-          
+
           echo "Workflow runtime limit reached. Bot will restart on next scheduled run."
         continue-on-error: true
 
