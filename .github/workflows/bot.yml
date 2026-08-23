@@ -1,24 +1,59 @@
-name: Minecraft 24/7 Bot
+name: Minecraft AFK Bot 24/7
 
 on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
   schedule:
     - cron: '*/30 * * * *'
-  workflow_dispatch:
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    timeout-minutes: 360
+    
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
+          cache: 'npm'
 
-      - name: Install Dependencies
-        run: npm install
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
 
-      - name: Run Bot Script
-        run: node bot.js
+      - name: Run AFK Bot
+        env:
+          MC_USERNAME: ${{ secrets.MC_USERNAME }}
+        run: |
+          echo "Starting Minecraft AFK Bot..."
+          node bot.js &
+          BOT_PID=$!
+          
+          # Keep the workflow alive for 6 hours
+          RUNTIME=21600
+          ELAPSED=0
+          
+          while [ $ELAPSED -lt $RUNTIME ]; do
+            if ! kill -0 $BOT_PID 2>/dev/null; then
+              echo "Bot process died, restarting..."
+              node bot.js &
+              BOT_PID=$!
+            fi
+            
+            sleep 60
+            ELAPSED=$((ELAPSED + 60))
+            echo "Runtime: $((ELAPSED / 60)) minutes / $((RUNTIME / 60)) minutes"
+          done
+          
+          echo "Workflow runtime limit reached. Bot will restart on next scheduled run."
+        continue-on-error: true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up processes..."
+          pkill -f "node bot.js" || true
