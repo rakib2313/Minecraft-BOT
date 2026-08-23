@@ -5,30 +5,39 @@ const botConfig = {
   port: 25987,
   username: 'HelperBot',
   version: '1.20.4',
-  // গিটহাবের হাই পিং ও ডিসকানেক্ট সমস্যা এড়ানোর জন্য টাইমআউট বাড়ানো হলো
-  checkTimeoutInterval: 60000 
+  checkTimeoutInterval: 60000
 };
 
 function createBot() {
   const bot = mineflayer.createBot(botConfig);
 
+  // মাইনফ্লেয়ারের ভেতরের ব্যাকগ্রাউন্ড ফিজিক্স ও গ্র্যাভিটি প্যাকেট পাঠানো বন্ধ করা
+  bot.on('inject_allowed', () => {
+    bot.physicsEnabled = false;
+  });
+
   bot.on('spawn', () => {
-    console.log('Bot successfully connected to server via GitHub Actions!');
-    console.log('Staying still to prevent any anti-cheat movement kicks.');
+    console.log('Bot spawned successfully! Internal physics completely disabled.');
+    bot.physicsEnabled = false; // কনফার্মেশনের জন্য নিশ্চিত করা হলো
+
+    // ১ মিনিট পর পর হাত নাড়াবে যেন AFK প্লাগিন কিক না দেয়
+    setInterval(() => {
+      bot.swingArm('right');
+    }, 60000);
   });
 
   bot.on('error', (err) => {
-    console.log('Bot error encountered: ', err);
+    console.log('Error encountered: ', err);
   });
 
   bot.on('kicked', (reason) => {
-    console.log('Bot kicked by server: ', JSON.stringify(reason));
+    console.log('Bot got kicked! Reason: ', JSON.stringify(reason));
   });
 
-  // ডিসকানেক্ট হলে ১৫ সেকেন্ড পর আবার রি-কানেক্ট করার চেষ্টা করবে
+  // কিক খেলে বা ডিসকানেক্ট হলে ১৫ সেকেন্ড পর অটো রিকানেক্ট করবে
   bot.on('end', () => {
     console.log('Bot disconnected. Reconnecting in 15 seconds...');
-    setTimeout(createBot, 15000); 
+    setTimeout(createBot, 15000);
   });
 }
 
