@@ -5,7 +5,14 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
   schedule:
-    - cron: '*/30 * * * *'
+    # প্রতি ৫ ঘণ্টায় একবার (৬ ঘণ্টার run শেষ হওয়ার আগে overlap কমাতে)
+    - cron: '0 */5 * * *'
+
+# সবচেয়ে গুরুত্বপূর্ণ: একসাথে শুধু ১টা run চলবে
+# নতুন run এলে পুরনো run বন্ধ হয়ে যাবে
+concurrency:
+  group: minecraft-single-bot
+  cancel-in-progress: true
 
 jobs:
   run-bot:
@@ -26,32 +33,28 @@ jobs:
 
       - name: Run AFK Bot
         env:
+          # ফিক্সড নাম — র‍্যান্ডম নয় (Secrets এ MC_USERNAME সেট করুন)
           MC_USERNAME: ${{ secrets.MC_USERNAME }}
         run: |
-          echo "Starting Minecraft AFK Bot..."
+          echo "Starting single Minecraft bot..."
           node bot.js &
           BOT_PID=$!
 
-          RUNTIME=21600
+          RUNTIME=21000
           ELAPSED=0
 
           while [ $ELAPSED -lt $RUNTIME ]; do
             if ! kill -0 $BOT_PID 2>/dev/null; then
-              echo "Bot process died, restarting..."
+              echo "Bot process died, restarting same bot..."
               node bot.js &
               BOT_PID=$!
             fi
-
             sleep 60
             ELAPSED=$((ELAPSED + 60))
-            echo "Runtime: $((ELAPSED / 60)) minutes / $((RUNTIME / 60)) minutes"
+            echo "Runtime: $((ELAPSED / 60)) min / $((RUNTIME / 60)) min"
           done
-
-          echo "Workflow runtime limit reached. Bot will restart on next scheduled run."
         continue-on-error: true
 
       - name: Cleanup
         if: always()
-        run: |
-          echo "Cleaning up processes..."
-          pkill -f "node bot.js" || true
+        run: pkill -f "node bot.js" || true
