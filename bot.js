@@ -9,7 +9,7 @@ const BOT_CONFIG = {
   username: process.env.MC_USERNAME || 'AI_Bot_' + Math.floor(Math.random() * 999),
   version: '1.20.4',
   hideErrors: true,
-  physicsEnabled: false,
+  physicsEnabled: true, // গ্র্যাভিটি অন রাখা হয়েছে যাতে Fly Kick না খায়
   viewDistance: 'tiny'
 };
 
@@ -23,36 +23,37 @@ let logIds = [];
 
 function createBot() {
   if (isReconnecting) return;
+  
+  console.log('[INIT] Creating Bot instance...');
   bot = mineflayer.createBot(BOT_CONFIG);
   bot.loadPlugin(pathfinder);
 
   bot.once('spawn', () => {
     console.log(`[SPAWN] Bot spawned at: ${bot.entity.position.floored()}`);
     
-    // High latency stability lock
-    bot.entity.velocity.set(0, 0, 0);
-    
+    // ১০ সেকেন্ডের ইনিশিয়াল সেফটি পজ (Chunk Load হওয়ার জন্য)
     setTimeout(() => {
       mcData = mcDataLoader(bot.version);
       
-      // ANTI-CHEAT SAFE MOVEMENTS
       const movements = new Movements(bot, mcData);
-      movements.canDig = false; // হাঁটার সময় ব্লক ভাঙবে না (অ্যান্টি-চিট সেফটি)
-      movements.allowParkour = false; // লাফিয়ে লাফিয়ে রিস্কি মুভমেন্ট করবে না
-      movements.allowSprinting = false; // ধীরে সুস্থে হাঁটবে
+      movements.canDig = true; // ব্লক ভাঙার পারমিশন
+      movements.allow1by1towers = false;
+      movements.allowSprinting = false; // সাধারণ গতিতে হাঁটবে
+      movements.allowParkour = false;
       bot.pathfinder.setMovements(movements);
       
+      // গাছের ব্লকের আইডি সংগ্রহ
       logIds = ['oak_log', 'birch_log', 'spruce_log', 'jungle_log', 'acacia_log', 'dark_oak_log', 'cherry_log', 'mangrove_log']
         .map(name => mcData.blocksByName[name]?.id)
         .filter(id => id !== undefined);
 
       isReady = true;
-      console.log('[SYSTEM] Anti-Cheat Safe AI Loop Started.');
+      console.log('[SYSTEM] Natural Physics & Smart AI Started.');
       
-      // Sequential async task runner (No overlapping setInterval)
+      // মূল কাজের লুপ শুরু
       runTaskQueue();
       
-    }, 20000); 
+    }, 10000); 
   });
 
   bot.on('kicked', handleDisconnect);
@@ -60,15 +61,14 @@ function createBot() {
   bot.on('error', handleDisconnect);
   
   bot.on('death', () => {
-    console.log('[DEATH] Bot died. Respawning cleanly...');
+    console.log('[DEATH] Bot died. Respawning...');
     isExecutingTask = false;
   });
 }
 
-// Helper sleep function
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// ================= SEQUENTIAL TASK QUEUE =================
+// ================= AI TASK QUEUE =================
 
 async function runTaskQueue() {
   while (isReady && !isReconnecting) {
@@ -77,40 +77,40 @@ async function runTaskQueue() {
       try {
         await processNextBestAction();
       } catch (err) {
-        console.log(`[TASK EXCEPTION] ${err.message || err}`);
+        console.log(`[TASK ERROR] ${err.message || err}`);
       }
       isExecutingTask = false;
     }
-    await sleep(3000); // 3-second delay between tasks for server-sync
+    await sleep(2000); // কাজের মাঝে ২ সেকেন্ড বিরতি
   }
 }
 
 async function processNextBestAction() {
-  // 1. DANGER CHECK (Highest Priority)
-  const mob = findNearestDanger();
-  if (mob) {
-    await fleeFromDanger(mob);
+  // ১. বিপদ এড়িয়ে চলা (বিপদ দেখলে পালাবে)
+  const dangerMob = findNearestDanger();
+  if (dangerMob) {
+    await fleeFromDanger(dangerMob);
     return;
   }
 
-  // 2. CRAFTING CHECK
+  // ২. ইনভেন্টরিতে গাছ থাকলে কাঠ (Planks) বানাবে
   if (hasLogs()) {
-    await craftPlanksSafely();
+    await craftPlanks();
     return;
   }
 
-  // 3. SAFE TREE CHOPPING
-  const safeLog = findSafeTreeLog();
-  if (safeLog) {
-    await chopTreeSafely(safeLog);
+  // ৩. গাছের কাছে গিয়ে গাছ কাটা
+  const treeLog = findNearbyTree();
+  if (treeLog) {
+    await chopTree(treeLog);
     return;
   }
 
-  // 4. SAFE WANDERING (Fallback)
-  await wanderSafely();
+  // ৪. স্বাভাবিক হাঁটাহাঁটি (Safe Wandering)
+  await wanderAround();
 }
 
-// ================= DANGER & FLEE =================
+// ================= 1. DANGER EVASION =================
 
 function findNearestDanger() {
   return bot.nearestEntity(e => 
@@ -121,69 +121,64 @@ function findNearestDanger() {
 }
 
 async function fleeFromDanger(mob) {
-  console.log(`[SAFE-AI] Danger detected (${mob.name}). Walking away...`);
+  console.log(`[DANGER] ${mob.name} detected! Moving to safe distance...`);
   
   const dx = bot.entity.position.x - mob.position.x;
   const dz = bot.entity.position.z - mob.position.z;
   
-  const targetX = bot.entity.position.x + (dx > 0 ? 10 : -10);
-  const targetZ = bot.entity.position.z + (dz > 0 ? 10 : -10);
+  const targetX = bot.entity.position.x + (dx > 0 ? 12 : -12);
+  const targetZ = bot.entity.position.z + (dz > 0 ? 12 : -12);
   
   try {
     bot.pathfinder.setGoal(new goals.GoalNear(targetX, bot.entity.position.y, targetZ, 2));
-    await sleep(4000);
+    await sleep(3000);
   } catch (e) {}
 }
 
-// ================= TREE CHOPPING =================
+// ================= 2. TREE CHOPPING =================
 
-function findSafeTreeLog() {
-  // ২০ ব্লকের মধ্যে এমন গাছ খুঁজবে যা বটের সমতলে (Y-level difference max 3)
+function findNearbyTree() {
   return bot.findBlock({
     matching: logIds,
-    maxDistance: 15,
+    maxDistance: 12,
     useExtraInfo: (block) => {
-      const heightDiff = Math.abs(block.position.y - bot.entity.position.y);
-      return heightDiff <= 3; // পাহাড়ে উঠে আত্মহত্যার হাত থেকে বাঁচাতে
+      // শুধু সমতলে থাকা গাছ নির্বাচন করবে (পাহাড় এড়াতে)
+      return Math.abs(block.position.y - bot.entity.position.y) <= 2;
     }
   });
 }
 
-async function chopTreeSafely(block) {
-  console.log(`[ACTION] Safe tree found at ${block.position.floored()}. Approaching...`);
+async function chopTree(block) {
+  console.log(`[TREE] Found tree at ${block.position.floored()}. Walking to it...`);
   
   try {
-    // Walk next to the tree block
-    bot.pathfinder.setGoal(new goals.GoalLookAtBlock(block.position, bot.world));
-    await sleep(3000);
+    // গাছের ব্লকের কাছে হেঁটে যাবে
+    bot.pathfinder.setGoal(new goals.GoalGetToBlock(block.position.x, block.position.y, block.position.z));
+    await sleep(4000);
 
-    const dist = bot.entity.position.distanceTo(block.position);
-    if (dist <= 4.5) {
+    // পৌঁছানোর পর ভাঙবে
+    if (bot.entity.position.distanceTo(block.position) <= 4.5) {
       if (bot.canDigBlock(block)) {
-        console.log('[ACTION] Digging log...');
-        bot.lookAt(block.position);
-        await sleep(500); // Human reaction simulation
+        console.log('[TREE] Chopping wood block...');
         await bot.dig(block);
-        console.log('[ACTION] Log chopped successfully!');
+        console.log('[TREE] Wood chopped successfully!');
         await sleep(1000);
       }
-    } else {
-      console.log('[ACTION] Could not reach tree safely (Too far/Lag). Skipping.');
     }
   } catch (err) {
-    console.log(`[ACTION] Chop attempt failed cleanly: ${err.message || 'Desync'}`);
+    console.log('[TREE] Action interrupted.');
     bot.pathfinder.stop();
   }
 }
 
-// ================= CRAFTING =================
+// ================= 3. CRAFTING =================
 
 function hasLogs() {
   return bot.inventory.items().some(item => item.name.endsWith('_log'));
 }
 
-async function craftPlanksSafely() {
-  console.log('[CRAFT] Converting logs into planks...');
+async function craftPlanks() {
+  console.log('[CRAFT] Processing inventory logs...');
   try {
     const logItem = bot.inventory.items().find(item => item.name.endsWith('_log'));
     if (!logItem) return;
@@ -195,41 +190,29 @@ async function craftPlanksSafely() {
       const recipe = bot.recipesFor(plankItem.id, null, 1, null)[0];
       if (recipe) {
         await bot.craft(recipe, 1, null);
-        console.log(`[CRAFT] Successfully crafted ${plankName}!`);
+        console.log(`[CRAFT] Crafted ${plankName}!`);
       }
     }
-  } catch (e) {
-    console.log('[CRAFT] Crafting postponed due to inventory sync.');
-  }
-  await sleep(1500);
+  } catch (e) {}
+  await sleep(1000);
 }
 
-// ================= WANDERING =================
+// ================= 4. WANDERING =================
 
-async function wanderSafely() {
-  console.log('[IDLE] Wandering around safely...');
+async function wanderAround() {
+  console.log('[WALK] Wandering to a safe area...');
   
-  // Head look animation
-  const yaw = bot.entity.yaw + (Math.random() - 0.5) * 1.5;
-  bot.look(yaw, 0, false);
-  
-  if (Math.random() < 0.3) {
-    bot.swingArm('right');
-    await sleep(1000);
-    return;
-  }
-
-  // Small random walk (within 4 blocks)
+  // ডানে বা বামে ৩-৪ ব্লক হেঁটে যাবে
   const rx = bot.entity.position.x + (Math.random() - 0.5) * 8;
   const rz = bot.entity.position.z + (Math.random() - 0.5) * 8;
   
   try {
     bot.pathfinder.setGoal(new goals.GoalNear(rx, bot.entity.position.y, rz, 1));
-    await sleep(3000);
+    await sleep(3500);
   } catch (e) {}
 }
 
-// ================= RECONNECT HANDLER =================
+// ================= RECONNECT =================
 
 function handleDisconnect(reason) {
   if (isReconnecting) return;
@@ -238,13 +221,13 @@ function handleDisconnect(reason) {
   isExecutingTask = false;
   
   const cleanReason = typeof reason === 'object' ? util.inspect(reason) : reason;
-  console.log(`[DISCONNECT] Reason: ${cleanReason}`);
-  console.log('[RECONNECT] Waiting 40 seconds to prevent duplicate login...');
+  console.log(`[DISCONNECT] ${cleanReason}`);
+  console.log('[RECONNECT] Reconnecting in 35 seconds...');
   
   setTimeout(() => {
     isReconnecting = false;
     createBot();
-  }, 40000);
+  }, 35000);
 }
 
 createBot();
