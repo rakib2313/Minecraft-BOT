@@ -1,31 +1,22 @@
 const mineflayer = require('mineflayer');
 
-// বটের কনফিগারেশন
 const botConfig = {
-  host: 'india2.freegamehost.xyz', // আপনার সার্ভার আইপি
-  port: 25987,                     // আপনার সার্ভার পোর্ট
-  username: 'HelperBot',           // বটের নাম
-  version: '1.20.4'                // আপনার সার্ভারের সঠিক ভার্সন
+  host: 'india2.freegamehost.xyz',
+  port: 25987,
+  username: 'HelperBot',
+  version: '1.20.4' // আপনার সার্ভারের আসল ভার্সন
 };
 
 function createBot() {
   const bot = mineflayer.createBot(botConfig);
 
   bot.on('spawn', () => {
-    console.log('Bot has spawned safely!');
+    console.log('Bot has spawned safely! No movement, perfectly still.');
     
-    // সেফ অ্যান্টি-এএফকে (Anti-AFK) সিস্টেম
-    // হাঁটাচলা বাদ দেওয়া হয়েছে, যেন সার্ভার 'invalid_player_movement' এরর না দেয়
+    // সব নড়াচড়া বাদ! অ্যান্টি-এএফকে (Anti-AFK) এর জন্য শুধু হাত নাড়বে
     setInterval(() => {
-      // মাথা ডানে-বায়ে বা ওপরে-নিচে রেন্ডম ঘোরানো
-      const yaw = Math.random() * Math.PI * 2;
-      const pitch = (Math.random() * Math.PI) - (Math.PI / 2);
-      bot.look(yaw, pitch, true);
-      
-      // হাত নাড়ানো
       bot.swingArm('right');
-      
-    }, 20000); // প্রতি ২০ সেকেন্ড পর পর এটি করবে
+    }, 60000); // প্রতি ৬০ সেকেন্ড (১ মিনিট) পর পর 
   });
 
   bot.on('error', (err) => {
@@ -36,12 +27,10 @@ function createBot() {
     console.log('Bot got kicked! Reason: ', JSON.stringify(reason));
   });
 
-  // অটো-রিকানেক্ট (১০ সেকেন্ড পর পর চেষ্টা করবে)
   bot.on('end', () => {
     console.log('Bot disconnected. Trying to reconnect in 10 seconds...');
     setTimeout(createBot, 10000); 
   });
 }
 
-// বট চালু করা
 createBot();
