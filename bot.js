@@ -3,7 +3,7 @@ const mineflayer = require('mineflayer');
 const botConfig = {
   host: 'india2.freegamehost.xyz',
   port: 25987,
-  username: 'AL HELAL BOT',
+  username: 'HelperBot',
   version: '1.20.4',
   checkTimeoutInterval: 60000
 };
@@ -11,30 +11,44 @@ const botConfig = {
 function createBot() {
   const bot = mineflayer.createBot(botConfig);
 
-  // মাইনফ্লেয়ারের ভেতরের ব্যাকগ্রাউন্ড ফিজিক্স ও গ্র্যাভিটি প্যাকেট পাঠানো বন্ধ করা
-  bot.on('inject_allowed', () => {
-    bot.physicsEnabled = false;
+  // সার্ভার বটকে স্পন/টেলিপোর্ট করা মাত্র পজিশন লক করা
+  bot.on('forcedMove', () => {
+    if (bot.entity) {
+      bot.entity.velocity.set(0, 0, 0);
+      bot.entity.onGround = true;
+    }
+  });
+
+  // চ্যাঙ্ক লোড হওয়ার আগে গ্র্যাভিটির কারণে মাটির নিচে পড়ে যাওয়া আটকানো
+  bot.on('physicsTick', () => {
+    if (bot.entity && bot.entity.velocity) {
+      if (bot.entity.velocity.y < 0) {
+        bot.entity.velocity.y = 0;
+        bot.entity.onGround = true;
+      }
+    }
   });
 
   bot.on('spawn', () => {
-    console.log('Bot spawned successfully! Internal physics completely disabled.');
-    bot.physicsEnabled = false; // কনফার্মেশনের জন্য নিশ্চিত করা হলো
+    console.log('Bot successfully spawned and position locked on ground!');
+    bot.clearControlStates();
 
-    // ১ মিনিট পর পর হাত নাড়াবে যেন AFK প্লাগিন কিক না দেয়
+    // Anti-AFK: ১ মিনিট পর পর হাত নাড়াবে
     setInterval(() => {
-      bot.swingArm('right');
+      if (bot && bot.swingArm) {
+        bot.swingArm('right');
+      }
     }, 60000);
   });
 
   bot.on('error', (err) => {
-    console.log('Error encountered: ', err);
+    console.log('Error encountered: ', err.message || err);
   });
 
   bot.on('kicked', (reason) => {
     console.log('Bot got kicked! Reason: ', JSON.stringify(reason));
   });
 
-  // কিক খেলে বা ডিসকানেক্ট হলে ১৫ সেকেন্ড পর অটো রিকানেক্ট করবে
   bot.on('end', () => {
     console.log('Bot disconnected. Reconnecting in 15 seconds...');
     setTimeout(createBot, 15000);
